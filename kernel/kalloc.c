@@ -12,7 +12,7 @@
 void freerange(void *pa_start, void *pa_end);
 
 extern char end[]; // first address after kernel.
-                   // defined by kernel.ld.
+// defined by kernel.ld.
 
 struct run {
   struct run *next;
@@ -24,18 +24,16 @@ struct {
 } kmem;
 
 void
-kinit()
-{
+kinit() {
   initlock(&kmem.lock, "kmem");
-  freerange(end, (void*)PHYSTOP);
+  freerange(end, (void *) PHYSTOP);
 }
 
 void
-freerange(void *pa_start, void *pa_end)
-{
+freerange(void *pa_start, void *pa_end) {
   char *p;
-  p = (char*)PGROUNDUP((uint64)pa_start);
-  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+  p = (char *) PGROUNDUP((uint64) pa_start);
+  for (; p + PGSIZE <= (char *) pa_end; p += PGSIZE)
     kfree(p);
 }
 
@@ -44,17 +42,16 @@ freerange(void *pa_start, void *pa_end)
 // call to kalloc().  (The exception is when
 // initializing the allocator; see kinit above.)
 void
-kfree(void *pa)
-{
+kfree(void *pa) {
   struct run *r;
 
-  if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+  if (((uint64) pa % PGSIZE) != 0 || (char *) pa < end || (uint64) pa >= PHYSTOP)
     panic("kfree");
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
-  r = (struct run*)pa;
+  r = (struct run *) pa;
 
   acquire(&kmem.lock);
   r->next = kmem.freelist;
@@ -66,17 +63,28 @@ kfree(void *pa)
 // Returns a pointer that the kernel can use.
 // Returns 0 if the memory cannot be allocated.
 void *
-kalloc(void)
-{
+kalloc(void) {
   struct run *r;
 
   acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if (r)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
-    memset((char*)r, 5, PGSIZE); // fill with junk
-  return (void*)r;
+  if (r)
+    memset((char *) r, 5, PGSIZE); // fill with junk
+  return (void *) r;
+}
+
+int
+free_mem_num(void) {
+  struct run *p;
+  int freepage = 0;
+  acquire(&kmem.lock);
+  p = kmem.freelist;
+  for (; p; p = p->next)
+    freepage++;
+  release(&kmem.lock);
+  return (freepage << 12);
 }
