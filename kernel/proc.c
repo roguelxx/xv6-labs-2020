@@ -243,6 +243,8 @@ userinit(void)
 
   p->state = RUNNABLE;
 
+  uvmcopy2kernel(p->pagetable, p->k_pagetable, 0, p->sz);
+
   release(&p->lock);
 }
 
@@ -259,6 +261,7 @@ growproc(int n)
     if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+    uvmcopy2kernel(p->pagetable, p->k_pagetable, sz-n, sz);
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
@@ -307,6 +310,8 @@ fork(void)
   pid = np->pid;
 
   np->state = RUNNABLE;
+
+  uvmcopy2kernel(np->pagetable, np->k_pagetable, 0, np->sz);
 
   release(&np->lock);
 

@@ -119,6 +119,9 @@ exec(char *path, char **argv)
   if (p->pid==1) {
     vmprint(p->pagetable, 2);
   }
+
+  uvmcopy2kernel(p->pagetable, p->k_pagetable, 0, sz);
+
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
