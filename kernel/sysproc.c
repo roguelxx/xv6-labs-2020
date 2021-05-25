@@ -70,6 +70,13 @@ sys_sleep(void)
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
+
+//  uint64 fp = r_fp();
+//  printf("backtrace1:\n");
+//  backtrace1(fp);
+  printf("backtrace:\n");
+  backtrace();
+
   return 0;
 }
 
