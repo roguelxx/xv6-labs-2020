@@ -63,7 +63,6 @@ usertrap(void)
     // an interrupt will change sstatus &c registers,
     // so don't enable until done with those registers.
     intr_on();
-
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
@@ -75,6 +74,15 @@ usertrap(void)
 
   if(p->killed)
     exit(-1);
+
+  if(which_dev == 2) {
+    p->tickscnt += 1;
+    if (p->trigger != 0 && p->tickscnt == p->trigger) {
+      p->trapframe->t3 = p->trapframe->epc;
+      p->trapframe->epc = p->handler_p;
+//      p->tickscnt = 0;
+    }
+  }
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
