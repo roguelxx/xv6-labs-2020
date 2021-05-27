@@ -486,9 +486,6 @@ ukernel_pagetable()
   ukvmmap(pagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
   ukvmmap(pagetable, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
   ukvmmap(pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
-//  ukvmmap(pagetable, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
-//  ukvmmap(pagetable, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
-//  ukvmmap(pagetable, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
   return pagetable;
 }
 
@@ -508,8 +505,8 @@ freewalk_branch(pagetable_t pagetable) {
   for (int i = 0; i < 512; i++) {
     pte_t pte = level1[i];
     if (pte & PTE_V) {
-      uint64 level2 = PTE2PA(pte);
-      kfree((void *) level2);
+      uint64 level0 = PTE2PA(pte);
+      kfree((void *) level0);
       level1[i] = 0;
     }
   }
@@ -525,11 +522,21 @@ uvmcopy2kernel(pagetable_t from_tbl, pagetable_t to_tbl, uint64 va_start, uint64
   pte_t *pte_from, *pte_to;
   uint64 i;
 
+  if (va_end >= PLIC) {
+    panic("newsz too large.");
+  }
+
   for(i = va_start; i < va_end; i += PGSIZE){
     if((pte_from = walk(from_tbl, i, 0)) == 0)
       panic("uvmcopy2kernel: pte_from should exist");
-    if ((pte_to = walk(to_tbl, i, 1)) == 0)
-      panic("uvmcopy2kernel: pte_to should exist");
-    *pte_to = *pte_from & (~PTE_U);
+//    if ((pte_from & PTE_V) == 0) {
+    if ((*pte_from & PTE_V) == 0) {
+      panic("no valid upte");
+    }
+    if ((pte_to = walk(to_tbl, i, 1)) == 0){
+      panic("uvmcopy2kernel: pte_to should exist");}
+//    *pte_to = *pte_from & (~PTE_U);
+    *pte_to = *pte_from;
+    *pte_to &= ~(PTE_U | PTE_W | PTE_X);
   }
 }
