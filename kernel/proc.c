@@ -382,12 +382,15 @@ exit(int status)
   // Parent might be sleeping in wait().
   wakeup1(original_parent);
 
+  // records the exit status
   p->xstate = status;
   p->state = ZOMBIE;
 
   release(&original_parent->lock);
 
   // Jump into the scheduler, never to return.
+  // cause scheduler only run the process whose state is RUNNABLE, NOT ZOMBIE
+  // so the zombie process yields the cpu permanently
   sched();
   panic("zombie exit");
 }

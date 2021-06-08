@@ -83,6 +83,7 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
   char ch;
   struct proc *pr = myproc();
 
+  // condition lock
   acquire(&pi->lock);
   for(i = 0; i < n; i++){
     while(pi->nwrite == pi->nread + PIPESIZE){  //DOC: pipewrite-full
@@ -91,8 +92,10 @@ pipewrite(struct pipe *pi, uint64 addr, int n)
         return -1;
       }
       wakeup(&pi->nread);
+      // sleep on &pi->nwrite chan, holding &pi->lock
       sleep(&pi->nwrite, &pi->lock);
     }
+    // wakeup when the pipe is empty, re-acquire condition lock &pi->lock
     if(copyin(pr->pagetable, &ch, addr + i, 1) == -1)
       break;
     pi->data[pi->nwrite++ % PIPESIZE] = ch;
@@ -109,14 +112,16 @@ piperead(struct pipe *pi, uint64 addr, int n)
   struct proc *pr = myproc();
   char ch;
 
-  acquire(&pi->lock);
+  acquire(&pi->lock); // conditin lock
   while(pi->nread == pi->nwrite && pi->writeopen){  //DOC: pipe-empty
     if(pr->killed){
       release(&pi->lock);
       return -1;
     }
+    // sleep on &pi->nread chan, while holding condition lock &pi->lock
     sleep(&pi->nread, &pi->lock); //DOC: piperead-sleep
   }
+  // wakeup when the pipe is full, re-acquire condition lock &pi->lock
   for(i = 0; i < n; i++){  //DOC: piperead-copy
     if(pi->nread == pi->nwrite)
       break;
