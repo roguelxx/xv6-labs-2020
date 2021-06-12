@@ -490,6 +490,7 @@ readi(struct inode *ip, int user_dst, uint64 dst, uint off, uint n)
 
   for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
     bp = bread(ip->dev, bmap(ip, off/BSIZE));
+    // 一共还剩下{n - tot}没读，当前block还剩下{BSIZE - off%BSIZE}没读
     m = min(n - tot, BSIZE - off%BSIZE);
     if(either_copyout(user_dst, dst, bp->data + (off % BSIZE), m) == -1) {
       brelse(bp);
@@ -656,14 +657,14 @@ namex(char *path, int nameiparent, char *name)
   struct inode *ip, *next;
 
   if(*path == '/')
-    ip = iget(ROOTDEV, ROOTINO);
+    ip = iget(ROOTDEV, ROOTINO); // ip-> ref ++
   else
-    ip = idup(myproc()->cwd);
+    ip = idup(myproc()->cwd); // ip-> ref ++
 
   while((path = skipelem(path, name)) != 0){
     ilock(ip);
     if(ip->type != T_DIR){
-      iunlockput(ip);
+      iunlockput(ip); // ip-> ref --
       return 0;
     }
     if(nameiparent && *path == '\0'){

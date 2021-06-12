@@ -1,3 +1,5 @@
+#include "param.h"
+
 struct file {
   enum { FD_NONE, FD_PIPE, FD_INODE, FD_DEVICE } type;
   int ref; // reference count
@@ -26,7 +28,7 @@ struct inode {
   short minor;
   short nlink;
   uint size;
-  uint addrs[NDIRECT+1+1];
+  uint addrs[NDIRECT+1+1]; // first '1' for single-indirect block, second '1' for double-indirect block
 };
 
 // map major device number to device functions.
