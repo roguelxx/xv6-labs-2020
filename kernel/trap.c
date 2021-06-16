@@ -5,6 +5,10 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -65,6 +69,9 @@ usertrap(void)
     intr_on();
 
     syscall();
+  } else if(r_scause() == 13 || r_scause() == 15){
+    if(mmap_handler(r_stval()) < 0)
+      p->killed = 1;
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
@@ -218,3 +225,38 @@ devintr()
   }
 }
 
+int
+mmap_handler(uint64 addr)
+{
+  struct proc *p = myproc();
+  if(addr >= p->sz || addr > MAXVA || addr < p->trapframe->sp)
+    return -1;
+  // find relevant file from vmas
+  int i;
+  for (i = 0; i < NVMA; ++i) {
+//    if (p->vmas[i].used && addr >= p->vmas[i].addr && addr <= (p->vmas[i].addr + p->vmas[i].length)) {
+    if (p->vmas[i].used && addr >= p->vmas[i].addr && addr < (p->vmas[i].addr + p->vmas[i].length)) {
+      uint64 mem = (uint64)kalloc();
+      if(mem == 0)
+        return -1;
+      memset((void *)mem, 0, PGSIZE);
+      ilock(p->vmas[i].f->ip);
+//      readi(p->vmas[i].f->ip, 1, mem, p->vmas[i].offset, PGSIZE);
+      readi(p->vmas[i].f->ip, 0, mem, PGROUNDDOWN(addr) - p->vmas[i].addr, PGSIZE);
+      iunlock(p->vmas[i].f->ip);
+      uint64 pm = PTE_U | PTE_V;
+      if (p->vmas[i].prot & PROT_READ)
+        pm |= PTE_R;
+      if (p->vmas[i].prot & PROT_WRITE)
+        pm |= PTE_W;
+      if(mappages(p->pagetable, addr, PGSIZE, mem, pm)<0){
+        kfree((void *)mem);
+        return -1;
+      };
+      break;
+    }
+  }
+  if(i == NVMA)
+    return -1;
+  return 0;
+}

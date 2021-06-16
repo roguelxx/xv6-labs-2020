@@ -484,3 +484,79 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_mmap(void)
+{
+  // addr & offset assume to be zero
+  int prot, flags, fd, length, i;
+  if(argint(1, &length) < 0 || argint(2, &prot) < 0 ||
+      argint(3, &flags) < 0 || argint(4, &fd) < 0)
+    return -1;
+  struct proc *p = myproc();
+  // original file is not writable &&
+  // i want to write the mapped file &&
+  // i need to modified the original file
+  if ((!p->ofile[fd]->writable) && (prot & PROT_WRITE) && (!(flags & MAP_PRIVATE))) {
+    return -1;
+  }
+  // find an unused vma
+//  struct file *mapfile = p->ofile[fd];
+  for (i = 0; i < NVMA; ++i) {
+    if(p->vmas[i].used == 0){
+      p->vmas[i].used = 1;
+      p->vmas[i].length = length;
+      p->vmas[i].addr = p->sz;
+      p->vmas[i].flags = flags;
+      p->vmas[i].prot = prot;
+      p->vmas[i].offset = 0;
+      p->vmas[i].f = filedup(p->ofile[fd]);
+//      p->vmas[i].f = mapfile;
+//      filedup(p->ofile[fd]);
+      break;
+    }
+  }
+  if(i == NVMA){
+    return -1;
+  }
+  p->sz += length; // allocate an unused region from heap to stack
+  return p->vmas[i].addr;
+}
+
+uint64
+sys_munmap(void)
+{
+  int addr, length;
+  if(argint(0, &addr)<0 || argint(1, &length)<0)
+    return -1;
+  struct proc *p = myproc();
+  int i;
+  for (i = 0; i < NVMA; i++) {
+//    if (p->vmas[i].used && addr >= p->vmas[i].addr && addr <= (p->vmas[i].addr + p->vmas[i].length)) {
+    if (p->vmas[i].used && addr >= p->vmas[i].addr && addr < (p->vmas[i].addr + p->vmas[i].length)) {
+        break;
+    }
+  }
+  if(i == NVMA){
+    return -1;
+  }
+  // why addr not p->vmas[i].addr
+  if(p->vmas[i].flags & MAP_SHARED) {
+    filewrite(p->vmas[i].f, addr, length); // question
+  }
+
+  if(addr == p->vmas[i].addr && length == p->vmas[i].length){ // unmap whole region
+    p->vmas[i].used = 0;
+    uvmunmap(p->pagetable, addr, length/PGSIZE, 1); // why length/PGSIZE, not length/PGSIZE + 1 ?
+    fileclose(p->vmas[i].f);
+  } else if (addr == p->vmas[i].addr){ // unmap at the start
+    uvmunmap(p->pagetable, addr, length/PGSIZE, 1);
+    p->vmas[i].addr += length;
+    p->vmas[i].length -= length;
+  } else if ((addr+length) == (p->vmas[i].addr + p->vmas[i].length)){ // unmap at the end
+    uvmunmap(p->pagetable, addr, length/PGSIZE, 1);
+    p->vmas[i].length -= length;
+  }
+//  p->sz -= length;
+  return 0;
+}
