@@ -241,14 +241,14 @@ mmap_handler(uint64 addr)
         return -1;
       memset((void *)mem, 0, PGSIZE);
       ilock(p->vmas[i].f->ip);
-//      readi(p->vmas[i].f->ip, 1, mem, p->vmas[i].offset, PGSIZE);
+//      readi(p->vmas[i].f->ip, 0, mem, p->vmas[i].offset, PGSIZE);
       readi(p->vmas[i].f->ip, 0, mem, PGROUNDDOWN(addr) - p->vmas[i].addr, PGSIZE);
       iunlock(p->vmas[i].f->ip);
-      uint64 pm = PTE_U | PTE_V;
-      if (p->vmas[i].prot & PROT_READ)
-        pm |= PTE_R;
-      if (p->vmas[i].prot & PROT_WRITE)
-        pm |= PTE_W;
+      uint64 pm = (p->vmas[i].prot << 1) | PTE_U | PTE_V;
+//      if (p->vmas[i].prot & PROT_READ)
+//        pm |= PTE_R;
+//      if (p->vmas[i].prot & PROT_WRITE)
+//        pm |= PTE_W;
       if(mappages(p->pagetable, addr, PGSIZE, mem, pm)<0){
         kfree((void *)mem);
         return -1;

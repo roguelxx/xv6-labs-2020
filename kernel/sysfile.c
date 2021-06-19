@@ -545,16 +545,14 @@ sys_munmap(void)
     filewrite(p->vmas[i].f, addr, length); // question
   }
 
+  uvmunmap(p->pagetable, addr, length/PGSIZE, 1); // why length/PGSIZE, not length/PGSIZE + 1 ?
   if(addr == p->vmas[i].addr && length == p->vmas[i].length){ // unmap whole region
     p->vmas[i].used = 0;
-    uvmunmap(p->pagetable, addr, length/PGSIZE, 1); // why length/PGSIZE, not length/PGSIZE + 1 ?
     fileclose(p->vmas[i].f);
   } else if (addr == p->vmas[i].addr){ // unmap at the start
-    uvmunmap(p->pagetable, addr, length/PGSIZE, 1);
     p->vmas[i].addr += length;
     p->vmas[i].length -= length;
   } else if ((addr+length) == (p->vmas[i].addr + p->vmas[i].length)){ // unmap at the end
-    uvmunmap(p->pagetable, addr, length/PGSIZE, 1);
     p->vmas[i].length -= length;
   }
 //  p->sz -= length;
